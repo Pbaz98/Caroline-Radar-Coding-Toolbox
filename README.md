@@ -61,7 +61,7 @@ An example of the `selection.parms` file is:
 ```
 
 + "project": name of the project
-+ "aoiDir": path/to/directory containing the shapefile(s) with the area of interest. You can draw an AoI and create the shapefile from geojson.io
++ "aoiDir": path/to/directory containing the shapefile(s) with the area of interest. You can draw an AoI and create the shapefile from geojson.io An example is available in the subfolder examples
 + "targetDB": path/to/database of the designated targets. 
   The up to date version of the TU Delft's Database of designated targets can be downloaded from: https://docs.google.com/spreadsheets/d/1_7z-NkgSXSUaAKjsdMYRlsOjZeyLqc-v/edit?usp=sharing&ouid=104604842686121190070&rtpof=true&sd=true
 
@@ -72,7 +72,7 @@ An example of the `selection.parms` file is:
 + "exclTarget": this list is to be filled with the target's number that we want not to select.
   The target's number is defined as the number in the first column of the Database. For example target 1 is the target with ID_by_operator1= CBW (see database)
 
-
+NOTE: please specify always absolute paths
 
 
 
