@@ -106,6 +106,7 @@ python main.py selection.parms
 
 **Troubleshooting**
 
+At the moment this README is written, not every target in the database has the epsg code specified. Please when you download the database for running the code, verify that every target has its corresponding epsg code. In case it's not, please use as temporary vesion the one contained in the example folder. That version was updated on 8/18/2023, and all the epsg codes are specified (but they need to be confirmed)
     
 In case the database is modified, and some columns are added/removed, the Code might fail in locating the correct column to read. You can manually solve this issue by opening `main.py` and updating the numbers of the columns corresponding to each datum:
     
