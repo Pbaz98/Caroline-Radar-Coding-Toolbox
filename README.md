@@ -94,7 +94,7 @@ python main.py selection.parms
 2. To visualize graphically the result, open the `.geojson` file, and copy-past the content to the right box at https://geojson.io. a map with AoI and the selected targets will be displayed:
 
 <figure>
-  <IMG SRC="cover.jpeg" WIDTH=400 ALIGN="center">
+  <IMG SRC="imgs/cover.jpeg" WIDTH=400 ALIGN="center">
 </figure>
 
 
@@ -110,5 +110,5 @@ python main.py selection.parms
 In case the database is modified, and some columns are added/removed, the Code might fail in locating the correct column to read. You can manually solve this issue by opening `main.py` and updating the numbers of the columns corresponding to each datum:
     
 <figure>
-  <IMG SRC="editmain.jpeg" WIDTH=400 ALIGN="left">
+  <IMG SRC="imgs/editmain.jpeg" WIDTH=400 ALIGN="left">
 </figure>
