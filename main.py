@@ -59,7 +59,6 @@ else:
     Its coordinates are transformed into the 'targetCRS' reference system, and 
     compared with the coordinates of the Area of Interest.
     Therefore the AoC coordinates must be provided in the 'targetCRS' reference system.
-    (TODO -> add code so that any CRS is accepted for the AoC)
     
 """
 # --- CONSTANTS ----------------------
@@ -100,7 +99,7 @@ targetCRS = 4258  # ETRS89
 CRSname = 'ETRS89'
 frameName = 'ETRF2000'
 frameEpoch = '2010'
-print('****************************************\nset the API to retrieve frameEpoch and frameName')
+print('****************************************\nin case of any inquiry, please contact bazzocchip@gmail.com [ToBeChanged]')
 
 
 # csv file Head
