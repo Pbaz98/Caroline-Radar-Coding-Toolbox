@@ -32,7 +32,7 @@ from datetime import datetime
 import openpyxl
 import requests
 import matplotlib.pyplot as plt
-import geopandas as gpd
+from geopandas import read_file, GeoDataFrame
 from shapely.geometry import Point, Polygon
 
 
@@ -59,6 +59,7 @@ else:
     Its coordinates are transformed into the 'targetCRS' reference system, and 
     compared with the coordinates of the Area of Interest.
     Therefore the AoC coordinates must be provided in the 'targetCRS' reference system.
+    (TODO -> add code so that any CRS is accepted for the AoC)
     
 """
 # --- CONSTANTS ----------------------
@@ -90,16 +91,16 @@ cellColdxW = 26
 
 # geometry columns
 cellColshape = 38
-cellColsize = 39
-cellColMRA = 40 # Max Reflecion Azimuth
-cellColMRE = 41 # Max Reflecion Elevation
+cellColsize = 38
+cellColMRA = 39 # Max Reflecion Azimuth
+cellColMRE = 40 # Max Reflecion Elevation
 
 # Target Coordinates Reference System (CRS)
 targetCRS = 4258  # ETRS89
 CRSname = 'ETRS89'
 frameName = 'ETRF2000'
-frameEpoch = '2010'
-print('****************************************\nin case of any inquiry, please contact bazzocchip@gmail.com [ToBeChanged]')
+frameEpoch = '2021'
+print('****************************************\nfor any inquiry please contact: bazzocchip@gmail.com')
 
 
 # csv file Head
@@ -128,8 +129,10 @@ if not(os.path.exists(outDir) and os.path.isdir(outDir)):
 # ------------------------------------
 
 # Load the Area of Interest
-shpPath = [p for p in aoiPath.rglob('*.shp')]
-shpData = gpd.read_file(shpPath[0])  
+if not os.path.exists(aoiPath):
+    raise Exception('The provided shapefile path doesn\'t exists')
+shpPath = [p for p in aoiPath.rglob('*interest.shp')]
+shpData = read_file(shpPath[0])  
 geometry = shpData.geometry
 AoC = geometry[0]
 gdfList = [{'Type': 'Polygon', 'Name': 'AoC', 'Geometry': AoC}]
@@ -160,12 +163,28 @@ cellRow = cellRowstart
 
 print('\n****************************************')
 
-while (content is not None) and (cellRow < 100):
+while (content is not None):
     # for the current row
     
+    # check if to exclude
+    if (cellRow-cellRowstart+1) in exclTarget:
+        print('excluding target from list...')
+        # prepare next iteration
+        cellRow = cellRow+1
+        content = sheet.cell(row=cellRow, column=cellColNorth).value
+        continue # The current target is to be excluded a priori
+            
     # Extract target ID and type
-    targetID = sheet.cell(row=cellRow, column=cellColID).value
-    targetType = sheet.cell(row=cellRow, column=cellColType).value
+    targetID = str(sheet.cell(row=cellRow, column=cellColID).value)
+    targetType = str(sheet.cell(row=cellRow, column=cellColType).value)
+    
+    # check if to exclude
+    if targetType != 'IGRS':
+        print('not an IGRS - excluding target from list...')
+        # prepare next iteration
+        cellRow = cellRow+1
+        content = sheet.cell(row=cellRow, column=cellColNorth).value
+        continue # The current target is to be excluded a priori
     
     # Extract coordinates
     Easting = sheet.cell(row=cellRow, column=cellColEast).value
@@ -217,24 +236,27 @@ while (content is not None) and (cellRow < 100):
 
         
     # Check if the target is inside the AoI
-    if AoC.contains(targetP):        
-        # Display data
+    if AoC.contains(targetP): 
+        
+        # orientation (performed first for convenience)
+        ascFlag = ('W' in targetType) or ('IGRS' in targetType) or ('B' in targetType) or ('FF' in targetType)
+        dscFlag = ('E' in targetType) or ('IGRS' in targetType) or ('B' in targetType) or ('FF' in targetType)
+        band = 'C'
+        
+        # Display data and switch between type
+        RCS0dB = None
         if 'IGRS' in targetType:
             print('\rrow n. '+ str(cellRow-cellRowstart+1)+', IGRS found: '+targetID) 
         elif 'CR' in targetType:
             print('\rrow n. '+ str(cellRow-cellRowstart+1)+', CR found: '+targetID)
+            targetType = 'CREF'
         elif 'TR' in targetType:
             print('\rrow n. '+ str(cellRow-cellRowstart+1)+', TR found: '+targetID)
+            targetType = 'CAT'
+            RCS0dB = 44
         else:
             print('\rrow n. '+ str(cellRow-cellRowstart+1)+', target found: '+targetID)
        
-        # check if to exclude
-        if (cellRow-cellRowstart+1) in exclTarget:
-            print('excluding target from list...')
-            # prepare next iteration
-            cellRow = cellRow+1
-            content = sheet.cell(row=cellRow, column=cellColNorth).value
-            continue # The current target is not saved in the list because it is not installed yet
         
         # extract dates
         startDate = str(sheet.cell(row=cellRow, column=cellColstartDate).value)
@@ -261,21 +283,22 @@ while (content is not None) and (cellRow < 100):
         try:
             endDate = datetime.strptime(endDate, '%Y%m%d').strftime('%Y%m%dT%H%MZ')
         except ValueError:
-            if 'TODAY' in endDate:
-                endDate = '99999999T9999Z'
+            if ('TODAY' in endDate) or (endDate == 'None'):
+                endDate = '99999999T9999Z' 
             else:
                 endDate = endDate
+        
         
         # Apply Corrections
         dAsc = np.array([0,0,0])
         dDsc = np.array([0,0,0])
-        for i in range(0,2):
+        for i in range(0,3):
             try:
                 dAsc[i] = float(sheet.cell(row=cellRow, column=cellColdxE+i).value)
             except Exception:
                 dAsc[i] = 0
         
-        for i in range(0,2):
+        for i in range(0,3):
             try:
                 dDsc[i] = float(sheet.cell(row=cellRow, column=cellColdxW+i).value)
             except Exception:
@@ -287,7 +310,9 @@ while (content is not None) and (cellRow < 100):
         dConv = np.array([c1,c4,1])
         
         plhAsc = np.array([lon,lat,elev]) + dAsc / dConv
+        plhASc = np.array([lon,lat,elev]) + np.array([-3.524*1e-6,-4.208*1e-7,-2.093])
         plhDsc = np.array([lon,lat,elev]) + dDsc / dConv
+        plhDSc = np.array([lon,lat,elev]) + np.array([+3.524*1e-6,-4.208*1e-7,-2.093])
         
         # extract geometry
         shape = str(sheet.cell(row=cellRow, column=cellColshape).value)
@@ -295,10 +320,6 @@ while (content is not None) and (cellRow < 100):
         MRA = sheet.cell(row=cellRow, column=cellColMRA).value
         MRE = sheet.cell(row=cellRow, column=cellColMRE).value
         
-        # orientation
-        ascFlag = ('W' in targetType) or ('IGRS' in targetType) or ('B' in targetType)
-        dscFlag = ('E' in targetType) or ('IGRS' in targetType) or ('B' in targetType)
-        band = 'C'
                        
         # save into a dictionary
         targetDict = {
@@ -336,17 +357,17 @@ while (content is not None) and (cellRow < 100):
                 "RCS0" : None
             },
             "geometry":{
-                "shape": shape,
+                "shape": targetType,#shape,
                 "flipped": True,
                 "leglength": leglength,
                 "azimuthDip": MRA,
                 "zenithDip": MRE
             },
-            "RCS0": None
+            "RCS0": RCS0dB
         }
-        
+
         selectedTargets.append(targetDict)
-        
+
         # Append to geodataframe
         gdfList.append({'Type': 'Point', 'Name': targetID+': '+targetType, 'Geometry': targetP})        
         
@@ -397,8 +418,9 @@ with open(csvpath, 'w', newline='') as csvfile:
 
 if mapFlag == 1:
     
-    gdf = gpd.GeoDataFrame(gdfList, geometry='Geometry',crs='EPSG:'+str(targetCRS))
+    gdf = GeoDataFrame(gdfList, geometry='Geometry',crs='EPSG:'+str(targetCRS))
     
     gdf.to_file(outDir+'SelectedTargetsMap.geojson', driver="GeoJSON")
     
     print(f'DONE: geojson file exported at '+outDir+'SelectedTargetsMap.geojson\n      visit geojson.io to display it')
+    print('TODO: the shape of the target is currently the targetTypoe --> fix it')
