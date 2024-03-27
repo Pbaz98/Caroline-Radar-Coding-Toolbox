@@ -1,9 +1,39 @@
-### Selection Algorithm
-v1.0 - 18/08/2023
+# Caroline Radar-Coding Toolbox (CRCT)
+v1.0 - 27/03/2024
 
-**Description**
+## Description
 
-The code is thought to be integrated in a bigger flow (e.g. Caroline), the I/O interface is as follows:
+The Caroline Radar-Coding Toolbox (CRCT) is a toolbox aimed at being integrated in Caroline, a computer system to process and analyze InSAR data recursively and automatically.
+
+
+<figure>
+  <IMG SRC="imgs/caroline.png" WIDTH=500 ALIGN="center">
+</figure>
+
+
+The CRCT Radar-codes (computes radar coordinates starting from) the position of artificial targets falling within the Area-of-Interest of the stacks processed by Doris, taking the information about them from a database. The latter is denominated Database of Designaed Targets (DT).
+
+The Radar coordinates are computed and stored into a file (Radar coordinates file, in the picture below). From that file, the coordinates can be parsed by an interface code (PSC file generation) into the DePSI working files.
+
+<figure>
+  <IMG SRC="imgs/flow_overview.png" WIDTH=300 ALIGN="center">
+</figure>
+
+
+
+The CRCT itself is therefore interfaced with Doris, DePSI, and the DT Database. In the following picture, a detailed diagram of the I/O interfaces of the code is shown.
+
+<figure>
+  <IMG SRC="imgs/code_structure.png" WIDTH=500 ALIGN="center">
+</figure>
+
+
+
+The toolbox is composed of two tools: 
++ `selection.py`: aimed at selecting the DT falling into the area of interest
++ `mainRC.py`: aimed at radar-coding the selected DT's coordinates. The latter is based on GECORIS.
+
+### selection.py 
 
 + *Input* : a `selection.parms` file containing the run parameters
 
@@ -12,15 +42,22 @@ The code is thought to be integrated in a bigger flow (e.g. Caroline), the I/O i
     + `reflectors.csv` file, to ensure compatibility with GECORIS and readability of output
     + `SelectedTargetsMap.geojson` file, to visualize graphically the selected reflectors
 
-At the moment, the radarcoding part is not yet ready, but will be available soon
+
+### mainRC.py 
+
++ *Input* : a `selection.parms` file containing the run parameters
+
++ *Output* : 3 files containing informations about the selected targets inside an Area of Interest (AoI)
+    + `reflectors.json` file, to ensure compatibility with GECORIS
+    + `reflectors.csv` file, to ensure compatibility with GECORIS and readability of output
+    + `SelectedTargetsMap.geojson` file, to visualize graphically the selected reflectors
 
 
 
 
 
 
-
-**Installation**
+## Installation
 
 From the terminal:
 
