@@ -46,16 +46,14 @@ from gecoris import geoUtils, crUtils, radarUtils, s1Utils
 from gecoris import plotUtils, atmoUtils, dorisUtils
 
 # EDIT
-from functions import s1UtilsPaolo as s1p
-import geopandas as gpd
+# import geopandas as gpd
 from tqdm import tqdm
-import shapely.geometry as sg
-from shapely.geometry import Polygon
-import re
-from gecoris import geoUtils
-from functions import ioUtilsPaolo as io
-from functions.ioUtilsPaolo import warning
-from functions import s1UtilsPaolo
+# import shapely.geometry as sg
+# from shapely.geometry import Polygon
+# import re
+# from functions import ioUtilsPaolo as io
+# from functions.ioUtilsPaolo import warning
+
 
 
 # constants:
@@ -184,18 +182,9 @@ class Reflector:
             if ovsFactor == 1:
                 
                 dateIdx = stack.acqDates.index(acqDate)
-                # SLC = s1UtilsPaolo.readSLC(SLCstack,dateIdx,boundingBox,method='select',
-                #                               deramp = True)
-                SLCcrop = s1UtilsPaolo.readSLC(SLC,dateIdx,boundingBox,method='crop',
-                                              deramp = True)
-                
-                    # SLC = s1UtilsPaolo.readSLC(file,masterMetadata,boundingBox,method='coregSingle',
-                                              # deramp = True)
 
-                    # IFG = s1Utils.readIFG(file,boundingBox)
-                
-                
-                
+                SLCcrop = dorisUtils.readSLC(SLC,dateIdx,boundingBox,method='crop')
+
                 metadata = stack.metadata[acqDate]
                 beta0 = np.power(np.abs(SLCcrop),2)/(metadata['beta0']**2)
                 if plotFlag > 1:
@@ -228,24 +217,23 @@ class Reflector:
                 self.data[slcIdx] = (acqDate,acqTime,status,RCSdB,peakSLC,peakAz,peakR,dAz,dR,dist,peakIFG)
                 
                 if status:
-                    # plot image DEBUG
-                    mrm_subset = np.abs(beta0)
-                    fig, ax = plt.subplots()
-                    # ax.imshow(mrm_subset)
+                    # plot image
+                    plt.rcParams.update({'font.size': 17})
                     X,Y = np.meshgrid(np.arange(boundingBox[1][0],boundingBox[1][1],1),
                                       np.arange(boundingBox[0][0],boundingBox[0][1],1))
-
-                    im = ax.pcolormesh(X, Y, mrm_subset, cmap='jet')
-                    # mrm_subset.plot(robust=True, ax=ax,cmap='jet')
-                    ax.scatter(peakR,peakAz,marker='^',color='k',label=f'RCS={np.round(RCSdB,1)}')
-                    ax.set_title(f'{self.id} {acqDate} {stack.id}\nstatus: {status}')
-                    ax.legend()
-                    ax.set_xlabel('Range [px]')
-                    ax.set_ylabel('Azimuth [px]')
+                    RCSapp = 10*np.log10(np.abs(beta0)*metadata["rangeResolution"]*metadata["azimuthResolution"])
+                    im = plt.pcolormesh(X, Y, RCSapp, cmap='jet',vmin=10,vmax=35)
+                    cbar = plt.colorbar(im)
+                    cbar.set_label('Apparent RCS [dBm2]', rotation=90, labelpad=20)
+                    plt.scatter(peakR,peakAz,200,linewidth=2,marker='+',color='k',label=f'RCS={np.round(RCSdB,1)}')
+                    plt.title(f'$\mathbf{{{self.id}}}$ {stack.id}\n{acqDate}\nstatus: {status}')
+                    plt.legend()
+                    plt.xlabel('$\mathbf{Range}$ [px]',fontsize=17)
+                    plt.ylabel('$\mathbf{Azimuth}$ [px]',fontsize=17)
                     saveDir = kwargs["outDir"]+os.sep+self.id+os.sep
                     if not os.path.exists(saveDir):
                         os.makedirs(saveDir)
-                    plt.savefig(saveDir+self.id+'_'+acqDate+'_'+stack.id+'.png',dpi=75)
+                    plt.savefig(saveDir+self.id+'_'+acqDate+'_'+stack.id+'.png',dpi=75,bbox_inches='tight')
                     plt.close()
                 
             
@@ -297,19 +285,12 @@ class Reflector:
                                                    Range[0],metadata,cropSize)
                     
                     # read SLC:
-                    SLCderamp = s1UtilsPaolo.readSLC(file,metadata,boundingBox,method='raw',
-                                              deramp = True)   
-                    #return # <----------------- UNTIL HERE EVERYTHING OK
+                    SLCderamp = dorisUtils.readSLC(file,metadata,boundingBox,method='raw')                    
+                    # oversample SLC
                     SLCovs,axes = radarUtils.oversample(SLCderamp,ovsFactor,metadata)
-
-                    # calibrate:
+                    # calibrate SLC
                     beta0 = np.power(np.abs(SLCovs),2)/(metadata['beta0']**2)
-                    # TODO: fix NESZ:
                     
-                    # plot the crop with the correct spacing
-                    #io.plotSLC(beta0,acqDate,axes = axes,units='meters')
-                    
- 
                     if plotFlag > 1:
                         if not 'outDir' in kwargs:
                             raise Exception('You must specify output directory for plots')
@@ -369,12 +350,9 @@ class Reflector:
                     boundingBox = radarUtils.getBoundingBox(Azimuth[0],
                                                    Range[0],metadata,
                                                    cropSize)
-                    # SLCraw = s1Utils.readSLC(file,boundingBox,method='raw',
-                    #                        deramp = False)
-                    # beta0 = np.power(np.abs(SLCraw),2)/(metadata['beta0']**2)
+
                     # read SLC:
-                    SLCraw = s1UtilsPaolo.readSLC(file,metadata,boundingBox,method='raw',
-                                              deramp = True)   
+                    SLCraw = dorisUtils.readSLC(file,metadata,boundingBox,method='raw')   
                     # return # <----------------- UNTIL HERE EVERYTHING OK
                     SLCraw,axes = radarUtils.oversample(SLCraw,ovsFactor,metadata)
 
@@ -449,8 +427,7 @@ class Reflector:
                 boundingBox = radarUtils.getBoundingBox(Azimuth[0],
                                                Range[0],metadata,10)
                 # read SLC:
-                SLCderamp = s1Utils.readSLC(file,boundingBox,method='raw',
-                                          deramp = True)
+                SLCderamp = dorisUtils.readSLC(file,metadata,boundingBox,method='raw')
                 
                 RCSdB,SCR = radarUtils.RCSintegral(SLCderamp,metadata,32)
             else:
@@ -498,8 +475,7 @@ class Reflector:
                 if ovsFactor > 1:
                     boundingBox = radarUtils.getBoundingBox(Azimuth[0],
                                             Range[0],metadata,cropSize)
-                    SLCderamp = s1UtilsPaolo.readSLC(file,metadata,boundingBox,method='raw',
-                                              deramp = True)   
+                    SLCderamp = dorisUtils.readSLC(file,metadata,boundingBox,method='raw')   
                     SLCovs,axes = radarUtils.oversample(SLCderamp,ovsFactor,metadata)
 
                     beta0 = np.power(np.abs(SLCovs),2)/(metadata['beta0']**2)
@@ -527,8 +503,7 @@ class Reflector:
                 else:
                      boundingBox = radarUtils.getBoundingBox(Azimuth[0],
                          Range[0],metadata,cropSize)
-                     SLCraw = s1Utils.readSLC(file,boundingBox,method='raw',
-                                              deramp = False)   
+                     SLCraw = dorisUtils.readSLC(file,metadata,boundingBox,method='raw')   
                      beta0 = np.power(np.abs(SLCraw),2)/(metadata['beta0']**2)
                      if status:
                          idx = np.unravel_index(np.argmax(beta0, axis=None), 
@@ -554,37 +529,65 @@ class Reflector:
                     np.array((acqDate,acqTime,status,RCSdB,peakSLC,peakAz,peakR,dAz,dR,
                      dist,np.nan), dtype=stackType))
                 self.stacks[stackIdx]['stack'] = stack
+        if stack.type == 'coreg':
+            if posFlag:
+                cropSize = coregCropSizePrecise
             else:
-                if posFlag:
-                    cropSize = coregCropSizePrecise
-                else:
-                    cropSize = coregCropSizeApprox
+                cropSize = coregCropSizeApprox
+            metadata = stack.metadata[acqDate]
+            masterMetadata = stack.masterMetadata
+            if 'atmoDir' in kwargs:
+                (Azimuth,Range) = radarUtils.radarcode(plh, masterMetadata,
+                                                        atmoDir=kwargs['atmoDir'],
+                                                        crs=crs)
+            else:
+                (Azimuth,Range) = radarUtils.radarcode(plh, masterMetadata,
+                                                        crs=crs)
+            boundingBox = radarUtils.getBoundingBox(Azimuth[0],
+                Range[0],masterMetadata,cropSize)
+            
+            # -----------------------------------------------------------
+            if 'SLC' in kwargs and 'acqDate' in kwargs:
+                SLC = kwargs['SLC']
+                acqDate = kwargs['acqDate']
+                slcIdx = kwargs['slcIdx']
+            else:
+                raise Exception('No stack containing SLCs has been passed...')
+                
+            if acqDate not in datesUpdate:
+                return 
+
+            # get status:
+            status = (acqDate > self.startDate and acqDate < self.endDate)
+            if ovsFactor == 1:
+                
+                dateIdx = stack.acqDates.index(acqDate)
+
+                SLCcrop = dorisUtils.readSLC(SLC,dateIdx,boundingBox,method='crop')
+
                 metadata = stack.metadata[acqDate]
-                masterMetadata = stack.masterMetadata
-                if 'atmoDir' in kwargs:
-                    (Azimuth,Range) = radarUtils.radarcode(plh, masterMetadata,
-                                                           atmoDir=kwargs['atmoDir'],
-                                                           crs=crs)
-                else:
-                    (Azimuth,Range) = radarUtils.radarcode(plh, masterMetadata,
-                                                           crs=crs)
-                boundingBox = radarUtils.getBoundingBox(Azimuth[0],
-                    Range[0],masterMetadata,cropSize)
-                SLC = s1Utils.readSLC(file,boundingBox,method='coreg',
-                                      deramp = False)
-                IFG = s1Utils.readIFG(file,boundingBox)
-                beta0 = np.power(np.abs(SLC),2)/(metadata['beta0']**2)
-                idx = np.unravel_index(np.argmax(beta0, axis=None), 
-                                       beta0.shape)
+                beta0 = np.power(np.abs(SLCcrop),2)/(metadata['beta0']**2)
+                # if plotFlag > 1:
+                #     if not 'outDir' in kwargs:
+                #         raise Exception('You must specify output directory for plots')
+                #     plotUtils.plotBeta0(SLCcrop,metadata,
+                #                             kwargs['outDir'],ovs=False) 
+                    
+                # find simple max:
+                idx = np.unravel_index(np.argmax(beta0, axis=None), beta0.shape)
+                # idx = np.unravel_index(beta0.argmax(), beta0.shape)
+
                 # peak measurement:
-                peakSLC = SLC[idx]
-                peakIFG = IFG[idx]
+                peakSLC = SLCcrop[idx]
+                peakIFG = None #IFG[idx]
                 RCSdB = radarUtils.beta2RCSdB(beta0[idx],metadata)
+
                 # coord. differences [m]
                 peakAz = boundingBox[0][0] + idx[0]
                 peakR = boundingBox[1][0] + idx[1]
                 dAz = (Azimuth[0]-peakAz)*metadata['azimuthSpacing']
                 dR = (Range[0]-peakR)*metadata['rangeSpacing']
+                # print(f'station: {self.id}, dR: {dR}, dAz: {dAz}')
                 # peak range:
                 # TODO: THis dist is wrong for coreg!
                 dist = (peakR/metadata['RSR'] + metadata['range0time'])*speedOfLight
@@ -594,9 +597,58 @@ class Reflector:
                 # append to existing data structure:
                 self.stacks[stackIdx]['data'] = np.append(
                     self.stacks[stackIdx]['data'],
-                    np.array((acqDate,acqTime,status,RCSdB,peakSLC,peakAz,peakR,dAz,dR,
-                     dist,peakIFG), dtype=stackType))
+                    np.array((acqDate,acqTime,status,RCSdB,peakSLC,peakAz,peakR,dAz,dR,dist,peakIFG), dtype=stackType))
                 self.stacks[stackIdx]['stack'] = stack
+                
+                if status:
+                    # plot image
+                    plt.rcParams.update({'font.size': 17})
+                    X,Y = np.meshgrid(np.arange(boundingBox[1][0],boundingBox[1][1],1),
+                                    np.arange(boundingBox[0][0],boundingBox[0][1],1))
+                    RCSapp = 10*np.log10(np.abs(beta0)*metadata["rangeResolution"]*metadata["azimuthResolution"])
+                    im = plt.pcolormesh(X, Y, RCSapp, cmap='jet',vmin=10,vmax=35)
+                    cbar = plt.colorbar(im)
+                    cbar.set_label('Apparent RCS [dBm2]', rotation=90, labelpad=20)
+                    plt.scatter(peakR,peakAz,200,linewidth=2,marker='+',color='k',label=f'RCS={np.round(RCSdB,1)}')
+                    plt.title(f'$\mathbf{{{self.id}}}$ {stack.id}\n{acqDate}\nstatus: {status}')
+                    plt.legend()
+                    plt.xlabel('$\mathbf{Range}$ [px]',fontsize=17)
+                    plt.ylabel('$\mathbf{Azimuth}$ [px]',fontsize=17)
+                    saveDir = kwargs["outDir"]+os.sep+self.id+os.sep
+                    if not os.path.exists(saveDir):
+                        os.makedirs(saveDir)
+                    plt.savefig(saveDir+self.id+'_'+acqDate+'_'+stack.id+'.png',dpi=75,bbox_inches='tight')
+                    plt.close()
+                
+        
+            return
+            # # -----------------------------------------------------------
+            # SLC = dorisUtils.readSLC(file,boundingBox,method='coreg')
+            # IFG = None #s1Utils.readIFG(file,boundingBox)
+            # beta0 = np.power(np.abs(SLC),2)/(metadata['beta0']**2)
+            # idx = np.unravel_index(np.argmax(beta0, axis=None), 
+            #                         beta0.shape)
+            # # peak measurement:
+            # peakSLC = SLC[idx]
+            # peakIFG = IFG[idx]
+            # RCSdB = radarUtils.beta2RCSdB(beta0[idx],metadata)
+            # # coord. differences [m]
+            # peakAz = boundingBox[0][0] + idx[0]
+            # peakR = boundingBox[1][0] + idx[1]
+            # dAz = (Azimuth[0]-peakAz)*metadata['azimuthSpacing']
+            # dR = (Range[0]-peakR)*metadata['rangeSpacing']
+            # # peak range:
+            # # TODO: THis dist is wrong for coreg!
+            # dist = (peakR/metadata['RSR'] + metadata['range0time'])*speedOfLight
+            # # zero-Doppler acq.time:
+            # tAzimuth,_ = radarUtils.radar2time(peakAz,peakR,metadata)
+            # acqTime = geoUtils.sod2UTC(tAzimuth)
+            # # append to existing data structure:
+            # self.stacks[stackIdx]['data'] = np.append(
+            #     self.stacks[stackIdx]['data'],
+            #     np.array((acqDate,acqTime,status,RCSdB,peakSLC,peakAz,peakR,dAz,dR,
+            #         dist,peakIFG), dtype=stackType))
+            # self.stacks[stackIdx]['stack'] = stack
         
 
     def getStackIdx(self,stackId):
@@ -888,9 +940,7 @@ class Reflector:
                 decimalDate = geoUtils.decimalYear(metadata['acqDate'])
                 if crs == 'ITRS':
                     xyz = geoUtils.itrf2itrf(xyz,decimalDate)
-                # elif kwargs["plate"]:
-                #     print('ETRF to ITRF2014 only')
-                #     xyz = geoUtils.etrf2itrf(xyz,2014) DEBUG
+
                 else:
                     xyz = geoUtils.etrf2itrf(xyz,decimalDate)
                 (tAzimuth_ITRS,tRange_ITRS,satVec
@@ -961,11 +1011,7 @@ class Reflector:
                 # plot all:
                 symb = plotUtils.symbolGenerator()
                 col = plotUtils.colorGenerator()
-                # DEBUG
-                # dAzLine = [dAz_ETRS,dAz_ITRS,dAz_SET,dAz_TROPO,dAz_IONO,dAz_BIST,dAz_DOPPLER,dAz_FM]
-                # dRLine = [dR_ETRS, dR_ITRS, dR_SET, dR_TROPO, dR_IONO, dR_BIST, dR_DOPPLER, dR_FM]
-                # lwALE = lwALE+0.1
-                # axes.plot(dRLine,dAzLine,'-k',linewidth=lwALE)
+
                 axes.plot(dR_ETRS,dAz_ETRS,next(symb)+next(col),
                           label='Initial' if legendCounter else "")
                 axes.plot(dR_ITRS,dAz_ITRS,next(symb)+next(col),
@@ -1463,16 +1509,12 @@ class Stack:
         if self.sensor == 'Sentinel-1':        
             if self.type == 'raw':
                 # For info about the structure of this function make reference to ToEditInGecoris.ipynb, point 2
-                slavePath,swathID,burstID,stationPoint = dorisUtils.swathBurst(self.stackDir,stations)
-                print(slavePath)
+                slavePath,swathID,burstID = dorisUtils.swathBurst(self.stackDir,stations)
+                print(f'station located on swath: {swathID}, burst: {burstID}')
                 self.subswath = 'IW'+swathID              
                 
-                # 2 ------- list all slaves:
-                    
-                    # path to the slave.res file [to be added as '/stacks/????????'+slavePath]
-
-                    
-                    # Find all the dates in the stackDir
+                # 2 ------- list all slaves:                  
+                # Find all the dates in the stackDir
                     
                 dateList = sorted([str(p).split('/')[-1] 
                                    for p in Path(self.stackDir).glob('[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')])
@@ -1492,8 +1534,7 @@ class Stack:
                 print(f'INFO: {idExcl} date(s) have been excluded')
                 
                 resList = [Path(self.stackDir + date + slavePath) for date in dateList]
-                # imgs = glob.glob(self.stackDir + os.sep +"slaves" + os.sep + "*"
-                                 # +self.subswath+".dim")
+
                 if not resList:
                     raise Exception('No Sentinel-1 images prepared by SNAP'
                                     +' in specified stack directory')
@@ -1504,8 +1545,8 @@ class Stack:
                 
                 
                 for file in tqdm(resList):
-                    metadata = s1p.readMetadata(file,Path(self.sourceDir),outDir)
-                    # metadata = s1Utils.readMetadata(file)
+                    metadata = dorisUtils.readMetadata(file,Path(self.sourceDir),outDir)
+
                     acqStr = metadata['acqDate'].strftime("%Y%m%d")
                     d[acqStr] = metadata.copy()
                 self.metadata = OrderedDict(sorted(d.items(), 
@@ -1523,24 +1564,17 @@ class Stack:
 
                 masterMDT = [p for p in Path(self.stackDir).rglob("master.res")][0]
                 
-                
-                
-                # station = stations[0]
-                # if station.descending:
-                #     stationPoint = sg.Point(station.descending.longitude*180/np.pi, station.descending.latitude*180/np.pi, station.descending.elevation)
-                # elif station.ascending:
-                #     stationPoint = sg.Point(station.ascending.longitude*180/np.pi, station.ascending.latitude*180/np.pi, station.ascending.elevation)
                     
                 
                 # read the master metadata (and the master acqDate)
-                self.masterMetadata = s1p.readMetadata(masterMDT,Path(self.sourceDir),outDir,mode='coreg',crop=cropFlag)
+                self.masterMetadata = dorisUtils.readMetadata(masterMDT,Path(self.sourceDir),outDir,mode='coreg',crop=cropFlag)
                 self.masterDate = self.masterMetadata['acqDate'].strftime("%Y%m%d")
                 
                 masterIndex = dateList.index(self.masterDate)
                 dateList = dateList[0:masterIndex]+dateList[(masterIndex+1):]
-                # dateList = [dateList[-1]]
+
                 
-                 # remove dates before start date
+                # remove dates before start date
                 start_idx = next(x for x, val in enumerate(dateList) if val > self.firstDate)
                 dateList = dateList[start_idx:]
                   
@@ -1553,7 +1587,7 @@ class Stack:
                         idExcl+=1
                 print(f'INFO: {idExcl} date(s) have been excluded')
 
-                # reduce dateList to 40-ish for speeding up keeping statistical significance
+                # reduce dateList to 40 for speeding up keeping statistical significance
                 if ('fullStack' in kwargs) and kwargs["fullStack"] == 0 and len(dateList)>40:
                     fullDateList = dateList
                     dateList = [fullDateList[i] for i in np.linspace(0, len(fullDateList)- 1, 40, dtype=int)]
@@ -1565,7 +1599,7 @@ class Stack:
                 
                 d = dict()
                 for file in tqdm(resList):
-                    metadata = s1p.readMetadata(file,
+                    metadata = dorisUtils.readMetadata(file,
                                                 Path(self.sourceDir),outDir,mode='coreg',crop=cropFlag)
                     acqStr = metadata['acqDate'].strftime("%Y%m%d")
                     d[acqStr] = metadata.copy()
@@ -1586,12 +1620,12 @@ class Stack:
         else:
             print('Sensor not yet implemented... skipping.')
 
-    def defMatrix(self,matrix,stationsIW):
+    # def defMatrix(self,matrix,stationsIW):
         
-        self.stationsMatrix = matrix
-        self.stationsIW = stationsIW
+    #     self.stationsMatrix = matrix
+    #     self.stationsIW = stationsIW
         
-        return
+    #     return
     
     def reduce(self, startDate):
         """
