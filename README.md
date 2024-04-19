@@ -45,12 +45,20 @@ The toolbox is composed of two tools:
 
 ### mainRC.py 
 
-+ *Input* : a `selection.parms` file containing the run parameters
++ *Input* : a `RC.parms` file containing the run parameters
 
 + *Output* : 3 files containing informations about the selected targets inside an Area of Interest (AoI)
-    + `reflectors.json` file, to ensure compatibility with GECORIS
-    + `reflectors.csv` file, to ensure compatibility with GECORIS and readability of output
-    + `SelectedTargetsMap.geojson` file, to visualize graphically the selected reflectors
+    + For each station with ID *xxxx* (es: BARN):
+      - `xxxx.json`: json file containing the log of the station's object
+      - `xxxx`: directory containing the SAR images cropped around the reflector at each epoch (only the ones when reflector was active)
+    + For each stack with ID *s1_yscyyy* (es: s1_dsc037):
+      - `s1_yscyyy.json`: json file containing the log of the stack's object
+    + `RadarCoordinates`: directory containing the information about the outcome of the RadarCoding process. Below, they are ordered with increasing level of detail:
+      1) `s1_yscyyy_RC.csv`: [for each stack] CSV file containing the coordinates of the reflectors. Its format is described in the next section.
+      2) `RCSanalysis_s1_yscyyy.png`: [for each stack] graph with the comparison between the predicted intensity and the measured intensity of the selected pixel.
+      3) `xxxx_s1_yscyyy_RC.png` [for each station and stack] timeseries of the Radar Coordinates (R,Az) along the stack. This is helpful to evaluate co-registration-induced errors.
+  
+With reference to the diagram of the CRCT, the Radar Coordinates corresponds to `s1_yscyyy_RC.csv`, while all the others are auxiliary plots.
 
 
 
